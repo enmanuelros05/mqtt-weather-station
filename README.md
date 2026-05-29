@@ -1,19 +1,17 @@
-# 🌦️ Simulación de Estaciones Meteorológicas - Protocolo MQTT y MySQL
+# Simulación de Estaciones Meteorológicas - Protocolo MQTT y MySQL
 
-Este proyecto implementa un sistema IoT simulado en Python que utiliza el protocolo MQTT para la transmisión de datos meteorológicos consolidados en tiempo real en formato JSON, y almacena las lecturas de forma estructurada y automatizada en una base de datos relacional MySQL.
-
----
-
-## 📋 Características
-
-*   **Publicador JSON**: Genera lecturas consolidadas para múltiples estaciones meteorológicas y las publica periódicamente agrupadas en un único objeto JSON.
-*   **Suscriptor MySQL**: Escucha los mensajes JSON en tiempo real a través de un tópico comodín (`+`) y los almacena de forma segura en una base de datos MySQL mediante consultas SQL parametrizadas.
-*   **API Paho-MQTT v2**: Implementado utilizando la API más reciente (`CallbackAPIVersion.VERSION2`) para garantizar compatibilidad futura.
-*   **Cierre Seguro**: Manejo ordenado de desconexión en ambos scripts ante interrupciones de teclado (`Ctrl+C`).
+Este proyecto contiene un publicador y un suscriptor desarrollados en Python. Simula el envío de datos meteorológicos a través del protocolo MQTT usando tramas JSON y almacena la información recibida en una base de datos MySQL.
 
 ---
 
-## 🛠️ Parámetros de Conexión
+## Estructura del Proyecto
+
+*   **publisher/publisher.py**: Genera datos aleatorios de sensores para tres estaciones meteorológicas y los envía agrupados en un JSON.
+*   **subscriber/subscriber.py**: Se conecta al broker MQTT, recibe los datos y los inserta en la base de datos MySQL.
+
+---
+
+## Configuración de Conexión
 
 ### 1. Broker MQTT
 *   **Servidor**: `mqtt.eict.ce.pucmm.edu.do`
@@ -21,18 +19,18 @@ Este proyecto implementa un sistema IoT simulado en Python que utiliza el protoc
 *   **Usuario**: `itt363-grupo3`
 *   **Contraseña**: `CnFebqnjbq7F`
 
-### 2. Base de Datos MySQL (Configurable en `subscriber.py`)
-*   **Host**: `localhost`
+### 2. Base de Datos MySQL
+*   **Host**: `localhost` (o la IP del servidor Linux)
 *   **Puerto**: `3306`
-*   **Usuario**: `root`
-*   **Contraseña**: `""` (vacio)
+*   **Usuario**: `root` (o el usuario configurado)
+*   **Contraseña**: `""` (o la contraseña del usuario)
 *   **Nombre de Base de Datos**: `estacion_meteorologica`
 
 ---
 
-## 🗄️ Esquema de Base de Datos MySQL
+## Esquema de la Base de Datos
 
-Para inicializar la base de datos y la tabla necesarias para este proyecto, ejecuta el siguiente script SQL en tu servidor MySQL:
+Script SQL para crear la base de datos y la tabla en el servidor MySQL:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS estacion_meteorologica;
@@ -52,16 +50,15 @@ CREATE TABLE IF NOT EXISTS lectura (
 
 ---
 
-## 📡 Jerarquía de Tópicos y Formato de Mensajes
+## Tópicos y Formato de Mensajes
 
-Los mensajes se publican utilizando la estructura consolidada:
+El publicador envía los datos al siguiente tópico:
+`/itt363-grupo3/estacion-ID/lecturas` (ejemplo: `/itt363-grupo3/estacion-1/lecturas`)
 
-$$\text{/itt363-grupo3/\{estacion-ID\}/lecturas}$$
+El suscriptor escucha usando el tópico wildcard:
+`/itt363-grupo3/+/lecturas`
 
-### Ejemplo de Tópico
-`/itt363-grupo3/estacion-1/lecturas`
-
-### Formato de Mensaje JSON (Payload)
+### Formato de Mensaje JSON
 ```json
 {
     "temperatura": 28,
@@ -72,33 +69,26 @@ $$\text{/itt363-grupo3/\{estacion-ID\}/lecturas}$$
 }
 ```
 
-> [!NOTE]
-> Para suscribirse a todas las estaciones simuladas de este grupo, el comodín de ruta utilizado es:
-> `/itt363-grupo3/+/lecturas`
-
 ---
 
-## 🚀 Instrucciones de Ejecución
+## Instrucciones para ejecutar
 
-### 1. Instalación de Dependencias
-
-Se requiere Python 3.8+ instalado. Instala las librerías necesarias ejecutando:
+### 1. Instalación de dependencias
+Ejecuta el siguiente comando para instalar las librerías necesarias:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Ejecutar el Suscriptor (Subscriber)
-
-El suscriptor debe iniciarse primero para conectarse tanto al broker MQTT como a la base de datos MySQL local:
+### 2. Ejecutar el Suscriptor
+Corre el suscriptor primero para que esté a la escucha y conectado a la base de datos:
 
 ```bash
 python subscriber/subscriber.py
 ```
 
-### 3. Ejecutar el Publicador (Publisher)
-
-En otra terminal independiente, inicia el publicador para empezar a generar datos simulados:
+### 3. Ejecutar el Publicador
+En otra terminal, corre el publicador para empezar a enviar los datos de las estaciones:
 
 ```bash
 python publisher/publisher.py
