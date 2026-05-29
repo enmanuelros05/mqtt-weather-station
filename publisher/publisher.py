@@ -1,6 +1,7 @@
 import paho.mqtt.client as mqtt
 import random
 import time
+import json
 
 # CONFIGURACIÓN MQTT
 BROKER = "mqtt.eict.ce.pucmm.edu.do"
@@ -38,34 +39,28 @@ except Exception as e:
 try:
     while True:
         for station in stations:
-            # Generar lecturas de sensores
-            temperatura = random.randint(20, 35)
-            humedad = random.randint(40, 95)
-            viento = random.randint(0, 100)
-            lluvia = random.randint(0, 50)
-            velocidad_viento = random.randint(0, 80)
-            direccion_viento = random.choice(wind_directions)
-
-            sensors = {
-                "temperatura": temperatura,
-                "humedad": humedad,
-                "viento": viento,
-                "lluvia": lluvia,
-                "velocidad-viento": velocidad_viento,
-                "direccion-viento": direccion_viento
+            # Generar objeto JSON consolidado con lecturas
+            payload = {
+                "temperatura": random.randint(20, 35),
+                "humedad": random.randint(40, 95),
+                "lluvia": random.randint(0, 50),
+                "velocidad_viento": random.randint(0, 80),
+                "direccion_viento": random.choice(wind_directions)
             }
 
-            # Publicar lectura de cada sensor
-            for sensor, value in sensors.items():
-                topic = f"/itt363-grupo3/estacion/{station}/sensores/{sensor}"
-                client.publish(topic, value)
-                
-                print(f"[{station}] -> {sensor}: {value}")
-            print("-" * 40)
+            topic = f"/itt363-grupo3/{station}/lecturas"
+            
+            # Publicar JSON serializado
+            client.publish(topic, json.dumps(payload))
+            
+            print(f"[{station}] -> Publicado en {topic}:")
+            print(json.dumps(payload, indent=4, ensure_ascii=False))
+            print("-" * 50)
 
         time.sleep(5)
 
 except KeyboardInterrupt:
     print("\nDeteniendo publicación y cerrando conexión...")
     client.disconnect()
-    print("Adios.")
+    print("Adios.")
+
