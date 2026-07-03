@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estación Meteorológica</title>
+    <!-- Bootstrap para que se vea bonito -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        
+        <!-- Fila del Título y Botón Actualizar -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="mb-0 fw-bold">Datos Recibidos</h2>
+            <button class="btn btn-light border shadow-sm px-4 fw-bold" onclick="pedirDatosIniciales()">Actualizar</button>
+        </div>
+        
+        <!-- Tabla de Datos -->
+        <div class="card shadow-sm border-0 rounded-0">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped text-center mb-0" style="border-color: #dee2e6;" id="tabla_lecturas">
+                        <thead class="table-light" style="background-color: #e9ecef;" id="cabecera_tabla">
+                            <tr>
+                                <th class="text-secondary fw-bold border-dark-subtle">ID Lectura</th>
+                                <th class="text-secondary fw-bold border-dark-subtle">Fecha / Hora</th>
+                                <th class="text-secondary fw-bold border-dark-subtle">Estación</th>
+                                <th class="text-secondary fw-bold border-dark-subtle">Temp. (°C)</th>
+                                <th class="text-secondary fw-bold border-dark-subtle">Humedad (%)</th>
+                                <th class="text-secondary fw-bold border-dark-subtle">Lluvia</th>
+                                <th class="text-secondary fw-bold border-dark-subtle">Vel. Viento</th>
+                                <th class="text-secondary fw-bold border-dark-subtle">Dir. Viento</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpo_tabla">
+                            <tr>
+                                <td colspan="8">Cargando datos...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <hr class="my-4 border-2">
+
+        <!-- Controles de Paginación -->
+        <div class="d-flex justify-content-between align-items-center">
+            <button class="btn btn-light border shadow-sm px-4 fw-bold" id="btn_anterior" onclick="pedirPaginaAnterior()" disabled>&lt; Anterior</button>
+            <span class="fw-bold text-secondary">Página Actual: <span id="texto_pagina">1</span></span>
+            <button class="btn btn-light border shadow-sm px-4 fw-bold" id="btn_siguiente" onclick="pedirPaginaSiguiente()">Siguiente &gt;</button>
+        </div>
+    </div>
+
+    <!-- Script de WebSockets (Socket.io) -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        // Variables para recordar los IDs mostrados y saber pedir "siguiente" o "anterior"
+        var primer_id_mostrado = null;
+        var ultimo_id_mostrado = null;
+        var pagina_actual = 1;
+
+        // Conectar al servidor mediante WebSockets
+        var socket = io();
+
+        // Cuando llegue un nuevo dato desde el servidor (vía MQTT o simulado)
+        socket.on('nueva_lectura', function(dato) {
+            // Solo lo agregamos si estamos en la primera página
+            if (pagina_actual === 1) {
+                agregarFilaArriba(dato);
+            }
+        });
+
+        // Función para agregar un dato nuevo arriba de la tabla
+        function agregarFilaArriba(dato) {
+            var cuerpoTabla = document.getElementById('cuerpo_tabla');
+            var filaHtml = armarFila(dato);
+            
+            // Si la tabla dice "Cargando" o "No hay", la vaciamos primero
+            if (cuerpoTabla.innerHTML.includes('Cargando') || cuerpoTabla.innerHTML.includes('No hay')) {
+                cuerpoTabla.innerHTML = '';
+            }
+
+            // Insertamos la fila arriba del todo
+            cuerpoTabla.insertAdjacentHTML('afterbegin', filaHtml);
+
+            // Actualizamos el primer ID
+            if (!primer_id_mostrado || dato.id_lectura > primer_id_mostrado) {
+                primer_id_mostrado = dato.id_lectura;
+            }
+
+            // Si hay más de 10 filas, borramos la de más abajo para mantener la paginación
+            if (cuerpoTabla.children.length > 10) {
+                cuerpoTabla.removeChild(cuerpoTabla.lastElementChild);
+            }
+        }
+
+        // Función auxiliar para crear el texto HTML de una fila
+        function armarFila(dato) {
+            // Formatear la fecha para que se vea mejor (opcional pero ayuda)
+            var fechaLimpia = dato.fecha_hora;
+            if (fechaLimpia && fechaLimpia.includes('T')) {
+                fechaLimpia = fechaLimpia.replace('T', ' ').substring(0, 19);
+            }
+
+            return '<tr>' +
+                '<td>' + dato.id_lectura + '</td>' +
+                '<td>' + (fechaLimpia || '-') + '</td>' +
+                '<td>' + dato.id_estacion + '</td>' +
+                '<td>' + dato.temperatura + '</td>' +
+                '<td>' + dato.humedad + '</td>' +
+                '<td>' + dato.lluvia + '</td>' +
+                '<td>' + dato.velocidad_viento + '</td>' +
+                '<td>' + dato.direccion_viento + '</td>' +
+                '</tr>';
+        }
+
+        // Función que pide los datos al servidor (usada por primera vez y por el botón Actualizar)
+        function pedirDatosIniciales() {
+            fetch('/obtener_datos')
+                .then(function(respuesta) { return respuesta.json(); })
+                .then(function(datos) {
+                    pagina_actual = 1;
+                    actualizarTabla(datos);
+                });
+        }
+
+        function pedirPaginaSiguiente() {
+            if (!ultimo_id_mostrado) return;
+            
+            fetch('/obtener_datos?direccion=siguiente&ultimo_id=' + ultimo_id_mostrado)
+                .then(function(respuesta) { return respuesta.json(); })
+                .then(function(datos) {
+                    if (datos.length > 0) {
+                        pagina_actual++;
+                        actualizarTabla(datos);
+                    } else {
+                        alert('Ya no hay más datos antiguos.');
+                    }
+                });
+        }
+
+        function pedirPaginaAnterior() {
+            if (!primer_id_mostrado || pagina_actual === 1) return;
+            
+            fetch('/obtener_datos?direccion=anterior&primer_id=' + primer_id_mostrado)
+                .then(function(respuesta) { return respuesta.json(); })
+                .then(function(datos) {
+                    if (datos.length > 0) {
+                        pagina_actual--;
+                        actualizarTabla(datos);
+                    }
+                });
+        }
+
+        // Esta función toma la lista de datos y la dibuja en la tabla
+        function actualizarTabla(datos) {
+            document.getElementById('texto_pagina').innerText = pagina_actual;
+            
+            // Habilitar o deshabilitar botón anterior
+            document.getElementById('btn_anterior').disabled = (pagina_actual === 1);
+
+            if (datos.length > 0) {
+                // Guardamos los IDs de los extremos usando id_lectura
+                primer_id_mostrado = datos[0].id_lectura;
+                ultimo_id_mostrado = datos[datos.length - 1].id_lectura;
+
+                var cuerpoHtml = '';
+                for (var j = 0; j < datos.length; j++) {
+                    cuerpoHtml += armarFila(datos[j]);
+                }
+                document.getElementById('cuerpo_tabla').innerHTML = cuerpoHtml;
+            } else {
+                document.getElementById('cuerpo_tabla').innerHTML = '<tr><td colspan="8">No hay lecturas.</td></tr>';
+            }
+        }
+
+        // Pedir los primeros datos al cargar la página
+        pedirDatosIniciales();
+    </script>
+</body>
+</html>
